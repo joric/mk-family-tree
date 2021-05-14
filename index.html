@@ -30,7 +30,7 @@ circle {
 }
 
 text {
-  font: 10px sans-serif;
+  font: 9px sans-serif;
   pointer-events: none;
   fill: #fff;
   text-anchor: middle;
@@ -76,10 +76,37 @@ h3  { width: 33%; position: absolute; left: 33%; padding: 25px; margin: 0px; tex
 
 var graph, nodes, links;
 
+function heatMapColorforValue(value){
+  var h = (1.0 - value) * 240
+  return "hsl(" + h + ", 100%, 50%)";
+}
+
+function red2blue(value) {
+  r = value * 255
+  b = (1.0 - value) *255
+  c = "rgb(" + r + ", 0, "+ b +")";
+  console.log(c)
+  return c
+}
+
 function myGraph(el) {
-  color = d3.scale.category20();
+  //color = d3.scale.category10();
+  //color = heatMapColorforValue
+  color = red2blue
+
   w = window.innerWidth;
   h = window.innerHeight;
+  let r = 35;
+
+  function factor(d) {
+    return d.outbound / (d.inbound + d.outbound)
+  }
+
+  force = d3.layout.force()
+  .charge(-500)
+  .linkDistance(100)
+  .linkStrength(2)
+  .size([w, h])
 
   d3.select("svg").remove(); 
 
@@ -100,8 +127,6 @@ function myGraph(el) {
     .append("svg:path")
     .attr("d", "M0,-5L10,0L0,5");
 
-    let r = 35;
-
     vis.append('svg:defs').append('marker')
         .attr({'id':'arrowhead',
             'viewBox':'-0 -5 10 10',
@@ -119,12 +144,6 @@ function myGraph(el) {
 
   layer1 = vis.append('g').attr("id","links");
   layer2 = vis.append('g').attr("id","nodes");
-
-  force = d3.layout.force()
-  .charge(-500)
-  .linkDistance(80)
-  .linkStrength(2)
-  .size([w, h]);
 
   nodes = force.nodes(),
   links = force.links();
@@ -148,12 +167,14 @@ function myGraph(el) {
 
     nodeEnter.append("circle")
       .attr("r", function(d) { return r; })
-      .style("fill", function(d) { return color(d.date); });
+      .style("fill", function(d) { return color( factor(d) ); });
 
     nodeEnter.append("title")
-      .text(function(d) {return d.title});
+      .text(function(d) {return "in: "+d.inbound +" out: "+ d.outbound + " factor: "+factor(d) })
+      //.text(function(d) {return d.title});
 
     nodeEnter.append("text")
+      .attr("dx", "0px")
       .attr("dy", ".3em")
       .attr("text-anchor", "middle")
       .text(function(d) {return d.name });
@@ -219,16 +240,18 @@ function parse(data) {
       let node = key
 
       if (ids.has(node))
-        nodes.push({"id":node, "group":'all', "name":node, "title":node, "date":''});
+        nodes.push({"id":node, "group":'all', "name":node, "title":node, "date":'', "inbound":0, "outbound":0});
   }
 
 
   for (let item of edges) {
     v = item[0]
     w = item[1]
-      A = findNode(v);
-      B = findNode(w);
-      links.push({"source":A,"target":B});
+    A = findNode(v);
+    B = findNode(w);
+    links.push({"source":A,"target":B});
+    A.outbound +=1
+    B.inbound +=1
   }
 
   update();

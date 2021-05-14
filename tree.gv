@@ -3,8 +3,12 @@ digraph {
 
   subgraph splits {
     helix -> corne;
+    jian -> jorian; 
+    jian -> jorne; 
+    jian -> jiran;
 
     corne -> {
+      jorne;
       "corneish zen";
       cornelius;
       fifi;

@@ -100,6 +100,23 @@ function myGraph(el) {
     .append("svg:path")
     .attr("d", "M0,-5L10,0L0,5");
 
+    let r = 35;
+
+    vis.append('svg:defs').append('marker')
+        .attr({'id':'arrowhead',
+            'viewBox':'-0 -5 10 10',
+            'refX':r,
+            'refY':0,
+            'orient':'auto',
+            'markerWidth':13,
+            'markerHeight':13,
+            'xoverflow':'visible'})
+        .append('svg:path')
+        .attr('d', 'M 0,-5 L 10 ,0 L 0,5')
+        .attr('fill', '#333')
+        .style('stroke','none');
+
+
   layer1 = vis.append('g').attr("id","links");
   layer2 = vis.append('g').attr("id","nodes");
 
@@ -118,7 +135,7 @@ function myGraph(el) {
       .data(links, function(d) { return d.source.id + "-" + d.target.id; });
 
     link.enter().insert("line")
-      .attr("class", "link");
+      .attr("class", "link").attr('marker-end','url(#arrowhead)');
 
     link.exit().remove();
 
@@ -130,7 +147,7 @@ function myGraph(el) {
       .call(force.drag);
 
     nodeEnter.append("circle")
-      .attr("r", function(d) { return 35; })
+      .attr("r", function(d) { return r; })
       .style("fill", function(d) { return color(d.date); });
 
     nodeEnter.append("title")

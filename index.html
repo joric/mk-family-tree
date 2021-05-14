@@ -1,0 +1,211 @@
+<!doctype html>
+<html>
+<head>
+<title>Mechanical Keyboard Family Tree</title>
+
+<style>
+
+body {
+    padding: 0em;
+    margin: 0em;
+    overflow: hidden;
+}
+
+line {
+  fill: none;
+  stroke: #888;
+  stroke-width: 1px;
+}
+
+path.link {
+  fill: none;
+  stroke: #888;
+  stroke-width: 1px;
+}
+
+circle {
+  fill: #ccc;
+  stroke: #333;
+  stroke-width: 1px;
+}
+
+text {
+  font: 10px sans-serif;
+  pointer-events: none;
+  fill: #fff;
+  text-anchor: middle;
+}
+
+#controls { width: 100%; bottom: 0px; position: absolute; padding: 0px; margin: 0px;}
+#controls_margin { display: block; margin:20px 35px 20px 35px; }
+
+//#graph { user-select: none; }
+#range { width: 100%; }
+h1  { width: 33%; position: absolute; padding: 19px; margin: 0px; }
+h3  { width: 33%; position: absolute; left: 33%; padding: 25px; margin: 0px; text-align: center; }
+#search_container { width: 25%; position: absolute; right: 0px; padding: 25px; margin: 0px; text-align: right; }
+#search { width: 100%; }
+
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/2.10.0/d3.v2.min.js"></script>
+<script src="http://cpettitt.github.io/project/graphlib-dot/latest/graphlib-dot.min.js"></script>
+
+<div id="graph"></div>
+<script>
+
+var graph, nodes, links;
+
+function myGraph(el) {
+  color = d3.scale.category20();
+  w = window.innerWidth;
+  h = window.innerHeight;
+
+  d3.select("svg").remove(); 
+
+  vis = this.vis = d3.select(el).append("svg:svg")
+    .attr("width", w)
+    .attr("height", h);
+
+  vis.append("svg:defs").selectAll("marker")
+    .data(["suit", "licensing", "resolved"])
+    .enter().append("svg:marker")
+    .attr("id", String)
+    .attr("viewBox", "0 0 500 500")
+    .attr("refX", 35)
+    .attr("refY", -3.5)
+    .attr("markerWidth", 6)
+    .attr("markerHeight", 6)
+    .attr("orient", "auto")
+    .append("svg:path")
+    .attr("d", "M0,-5L10,0L0,5");
+
+  layer1 = vis.append('g').attr("id","links");
+  layer2 = vis.append('g').attr("id","nodes");
+
+  force = d3.layout.force()
+  .charge(-500)
+  .linkDistance(80)
+  .linkStrength(2)
+  .size([w, h]);
+
+  nodes = force.nodes(),
+  links = force.links();
+
+  update = function () {
+
+    var link = layer1.selectAll("line.link")
+      .data(links, function(d) { return d.source.id + "-" + d.target.id; });
+
+    link.enter().insert("line")
+      .attr("class", "link");
+
+    link.exit().remove();
+
+    var node = layer2.selectAll("g.node")
+      .data(nodes, function(d) { return d.id;});
+
+    var nodeEnter = node.enter().append("g")
+      .attr("class", "node")
+      .call(force.drag);
+
+    nodeEnter.append("circle")
+      .attr("r", function(d) { return 35; })
+      .style("fill", function(d) { return color(d.date); });
+
+    nodeEnter.append("title")
+      .text(function(d) {return d.title});
+
+    nodeEnter.append("text")
+      .attr("dy", ".3em")
+      .attr("text-anchor", "middle")
+      .text(function(d) {return d.name });
+
+    node.exit().remove();
+
+    force.on("tick", function() {
+      link.attr("x1", function(d) { return d.source.x; })
+        .attr("y1", function(d) { return d.source.y; })
+        .attr("x2", function(d) { return d.target.x; })
+        .attr("y2", function(d) { return d.target.y; });
+      node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+
+
+      link.attr("d", function(d) {
+        var dx = d.target.x - d.source.x,
+        dy = d.target.y - d.source.y,
+        dr = Math.sqrt(dx * dx + dy * dy);
+        return "M" + d.source.x + "," + d.source.y + "A" + dr + "," + dr + " 0 0,1 " + d.target.x + "," + d.target.y;
+      });
+      
+
+    });
+
+    // Restart the force layout.
+    force.start();
+  }
+
+  findNode = function(id) {
+    for (var i in nodes) {if (nodes[i]["id"] === id) return nodes[i]};
+  }
+}
+
+window.onresize = function() {
+  w = window.innerWidth;
+  h = window.innerHeight;
+  force.size([w, h]);
+  vis.attr("width", w).attr("height", h);
+  update();
+}
+
+function parse(data) {
+
+  nodes.length = 0;
+  links.length = 0;
+  count = 0;
+
+  ids = new Set()
+  edges = new Set()
+
+  for (let key of Object.keys(data._edgeObjs)) {
+      var value = data._edgeObjs[key];
+      let v = value.v
+      let w = value.w
+      ids.add(v);
+      ids.add(w);
+      edges.add([v,w])
+  }
+
+
+  for (let key of Object.keys(data._nodes)) {
+      var value = data._nodes[key];
+      let node = key
+
+      if (ids.has(node))
+        nodes.push({"id":node, "group":'all', "name":node, "title":node, "date":''});
+  }
+
+
+  for (let item of edges) {
+    v = item[0]
+    w = item[1]
+      A = findNode(v);
+      B = findNode(w);
+      links.push({"source":A,"target":B});
+  }
+
+  update();
+
+}
+
+
+graph = new myGraph("#graph");
+
+fetch('https://joric.github.io/mk-family-tree/tree.gv')
+  .then(response => response.text())
+  .then((data) => {
+   var g = graphlibDot.read(data);
+   parse(g)
+})
+
+</script>

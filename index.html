@@ -76,22 +76,14 @@ h3  { width: 33%; position: absolute; left: 33%; padding: 25px; margin: 0px; tex
 
 var graph, nodes, links;
 
-function heatMapColorforValue(value){
-  var h = (1.0 - value) * 240
-  return "hsl(" + h + ", 100%, 50%)";
-}
-
 function red2blue(value) {
   r = value * 255
   b = (1.0 - value) *255
-  c = "rgb(" + r + ", 0, "+ b +")";
-  console.log(c)
-  return c
+  return "rgb(" + r + ", 0, "+ b +")";
 }
 
 function myGraph(el) {
   //color = d3.scale.category10();
-  //color = heatMapColorforValue
   color = red2blue
 
   w = window.innerWidth;

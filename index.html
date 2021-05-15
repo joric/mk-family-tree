@@ -123,13 +123,15 @@ chart = function() {
         .attr("r", d=>radiusw(d.w))
         .attr('fill', d=>colorw(d.w));
 
-    node.append("text")
+    node
+        .append("svg:a").attr("xlink:href", function(d){ return "https://duckduckgo.com/?q=!ducky+" + encodeURI(d.id+" keyboard")})
+        .append("text")
         .attr("text-anchor", "middle")
         .attr("x", 0)
         .attr("y", "0.31em")
         .text(d => d.id)
         .attr("fill", "black")
-        .attr('pointer-events','none')
+        .attr('pointer-events','all')
 
     node.on('dblclick', (e, d) => console.log(nodes[d.index]))
 

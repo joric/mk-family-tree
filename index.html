@@ -185,6 +185,7 @@ resize()
 
 
 fetch('https://joric.github.io/mk-family-tree/tree.gv')
+//fetch('https://raw.githubusercontent.com/petejohanson/mk-family-tree/main/tree.gv')
   .then(response => response.text())
   .then((text) => {
    var g = graphlibDot.read(text);

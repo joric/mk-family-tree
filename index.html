@@ -1,272 +1,194 @@
-<!doctype html>
-<html>
-<head>
-<title>Mechanical Keyboard Family Tree</title>
-
-<style>
-
-body {
-    padding: 0em;
-    margin: 0em;
-    overflow: hidden;
-}
-
-line {
-  fill: none;
-  stroke: #888;
-  stroke-width: 1px;
-}
-
-path.link {
-  fill: none;
-  stroke: #888;
-  stroke-width: 1px;
-}
-
-circle {
-  fill: #ccc;
-  stroke: #333;
-  stroke-width: 1px;
-}
-
-text {
-  font: 9px sans-serif;
-  pointer-events: none;
-  fill: #fff;
-  text-anchor: middle;
-}
-
-#controls { width: 100%; bottom: 0px; position: absolute; padding: 0px; margin: 0px;}
-#controls_margin { display: block; margin:20px 35px 20px 35px; }
-
-//#graph { user-select: none; }
-#range { width: 100%; }
-h1  { width: 33%; position: absolute; padding: 19px; margin: 0px; }
-h3  { width: 33%; position: absolute; left: 33%; padding: 25px; margin: 0px; text-align: center; }
-#search_container { width: 25%; position: absolute; right: 0px; padding: 25px; margin: 0px; text-align: right; }
-#search { width: 100%; }
-
-.github-corner {
-  border-bottom: 0;
-  position: fixed;
-  right: 0;
-  text-decoration: none;
-  top: 0;
-  z-index: 1
-}
-
-.github-corner:hover .octo-arm {
-  animation: a .56s ease-in-out
-}
-
-.github-corner svg {
-  color: #fff;
-  fill: #000; /* github-corner color*/
-  height: 80px;
-  width: 80px
-}
-
-</style>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/2.10.0/d3.v2.min.js"></script>
+<!DOCTYPE html>
+<meta charset="utf-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/6.7.0/d3.min.js"></script>
 <script src="https://cpettitt.github.io/project/graphlib-dot/latest/graphlib-dot.min.js"></script>
 
+<!--
+see https://observablehq.com/@brunolaranjeira/d3-v6-force-directed-graph-with-directional-straight-arrow
+-->
+
+<style>
+body { padding: 0em; margin: 0em; overflow: hidden; }
+</style>
+
+<body>
+
 <div id="graph"></div>
+
 <script>
 
-var graph, nodes, links;
+linkArc = d =>`M${d.source.x},${d.source.y}A0,0 0 0,1 ${d.target.x},${d.target.y}`;
 
-function red2blue(value) {
-  r = value * 255
-  b = (1.0 - value) *255
-  return "rgb(" + r + ", 0, "+ b +")";
+const r = 35
+
+radiusw = function(w) {
+  return (r * (1 + Math.min(w,10)/10.0))
 }
 
-function myGraph(el) {
-  //color = d3.scale.category10();
-  color = red2blue
+function gradient(value) {
+  var r = value * 255
+  b = (1.0 - value) * 255
+  return "rgb(" + r + ", 210, "+ b +")";
+}
 
-  w = window.innerWidth;
-  h = window.innerHeight;
-  let r = 35;
+colorw = function(w) {
+  return gradient(Math.min(w,5)/5.0)
+};
 
-  function factor(d) {
-    return d.outbound / (d.inbound + d.outbound)
+var simulation
+
+////////////////////////////////////////////////////
+// chart
+drag = function(simulation) {
+  function dragsubject(event) {
+    return simulation.find(event.x, event.y);
   }
 
-  force = d3.layout.force()
-  .charge(-500)
-  .linkDistance(100)
-  .linkStrength(2)
-  .size([w, h])
+  function dragstarted(event) {
+    if (!event.active) simulation.alphaTarget(0.3).restart();
+    event.subject.fx = event.subject.x;
+    event.subject.fy = event.subject.y;
+  }
+  
+  function dragged(event) {
+    event.subject.fx = event.x;
+    event.subject.fy = event.y;
+  }
+  
+  function dragended(event) {
+    if (!event.active) simulation.alphaTarget(0);
+    event.subject.fx = null;
+    event.subject.fy = null;
+  }
+  
+  return d3.drag()
+      .subject(dragsubject)
+      .on("start", dragstarted)
+      .on("drag", dragged)
+      .on("end", dragended);
+}
 
-  d3.select("svg").remove(); 
+chart = function() {
 
-  vis = this.vis = d3.select(el).append("svg:svg")
-    .attr("width", w)
-    .attr("height", h);
+  const links = data.links.map(d => Object.create(d));
+  const nodes = data.nodes.map(d => Object.create(d));
 
-  vis.append("svg:defs").selectAll("marker")
-    .data(["suit", "licensing", "resolved"])
-    .enter().append("svg:marker")
-    .attr("id", String)
-    .attr("viewBox", "0 0 500 500")
-    .attr("refX", 35)
-    .attr("refY", -3.5)
-    .attr("markerWidth", 6)
-    .attr("markerHeight", 6)
-    .attr("orient", "auto")
-    .append("svg:path")
-    .attr("d", "M0,-5L10,0L0,5");
+    simulation = d3.forceSimulation(nodes)
+        .force("link", d3.forceLink(links).id(d => d.id))
+        .force("charge", d3.forceManyBody().strength(-500))
+        .force("x", d3.forceX())
+        .force("y", d3.forceY())
+        .force("center", d3.forceCenter(width/2, height/2))
+        .force('collide', d3.forceCollide(d => radiusw(d.w)*1.5))
 
-    vis.append('svg:defs').append('marker')
-        .attr({'id':'arrowhead',
-            'viewBox':'-0 -5 10 10',
-            'refX':r,
-            'refY':0,
-            'orient':'auto',
-            'markerWidth':13,
-            'markerHeight':13,
-            'xoverflow':'visible'})
-        .append('svg:path')
-        .attr('d', 'M 0,-5 L 10 ,0 L 0,5')
-        .attr('fill', '#333')
-        .style('stroke','none');
+    const svg = d3.create("svg")
+      .attr("width", width).attr("height", height);
 
+    svg.append("defs").selectAll("marker")
+        .data(links)
+        .join("marker")
+        .attr("id", d => `arrow-${d.source.id}`)
+        .attr("viewBox", "0 -5 10 10")
+        .attr("refX", d=>radiusw(d.target.w)+15)
+        .attr("refY", 0)
+        .attr("markerWidth", 6)
+        .attr("markerHeight", 6)
+        .attr("orient", "auto")
+        .append("path")
+        .attr("fill", d=>colorw(d.source.w))
+        .attr("d", 'M0,-5L10,0L0,5');
 
-  layer1 = vis.append('g').attr("id","links");
-  layer2 = vis.append('g').attr("id","nodes");
-
-  nodes = force.nodes(),
-  links = force.links();
-
-  update = function () {
-
-    var link = layer1.selectAll("line.link")
-      .data(links, function(d) { return d.source.id + "-" + d.target.id; });
-
-    link.enter().insert("line")
-      .attr("class", "link").attr('marker-end','url(#arrowhead)');
-
-    link.exit().remove();
-
-    var node = layer2.selectAll("g.node")
-      .data(nodes, function(d) { return d.id;});
-
-    var nodeEnter = node.enter().append("g")
-      .attr("class", "node")
-      .call(force.drag);
-
-    nodeEnter.append("circle")
-      .attr("r", function(d) { return r; })
-      .style("fill", function(d) { return color( factor(d) ); });
-
-    nodeEnter.append("title")
-      .text(function(d) {return "in: "+d.inbound +" out: "+ d.outbound + " factor: "+factor(d) })
-      //.text(function(d) {return d.title});
-
-    nodeEnter.append("text")
-      .attr("dx", "0px")
-      .attr("dy", ".3em")
-      .attr("text-anchor", "middle")
-      .text(function(d) {return d.name });
-
-    node.exit().remove();
-
-    force.on("tick", function() {
-      link.attr("x1", function(d) { return d.source.x; })
-        .attr("y1", function(d) { return d.source.y; })
-        .attr("x2", function(d) { return d.target.x; })
-        .attr("y2", function(d) { return d.target.y; });
-      node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+    const link = svg.append("g")
+        .attr("fill", "none")
+        .attr("stroke-width", 1.5)
+        .selectAll("path")
+        .data(links)
+        .join("path")
+        .attr("stroke", d=>colorw(d.source.w))
+        .attr("marker-end", d => `url(${new URL(`#arrow-${d.source.id}`, location)})`);
 
 
-      link.attr("d", function(d) {
-        var dx = d.target.x - d.source.x,
-        dy = d.target.y - d.source.y,
-        dr = Math.sqrt(dx * dx + dy * dy);
-        return "M" + d.source.x + "," + d.source.y + "A" + dr + "," + dr + " 0 0,1 " + d.target.x + "," + d.target.y;
-      });
-      
+    const node = svg.append("g")
+        .attr("fill", "currentColor")
+        .attr("stroke-linecap", "round")
+        .attr("stroke-linejoin", "round")
+        .selectAll("g")
+        .data(nodes)
+        .join("g")
+        .call(drag(simulation));
 
+    node.append("circle")
+        .attr("stroke", "white")
+        .attr("stroke-width", 1.5)
+        .attr("r", d=>radiusw(d.w))
+        .attr('fill', d=>colorw(d.w));
+
+    node.append("text")
+        .attr("text-anchor", "middle")
+        .attr("x", 0)
+        .attr("y", "0.31em")
+        .text(d => d.id)
+        .attr("fill", "black")
+        .attr('pointer-events','none')
+
+    node.on('dblclick', (e, d) => console.log(nodes[d.index]))
+
+
+    simulation.on("tick", () => {
+        node.attr("cx", function(d) {return d.x = Math.max(radiusw(d.w), Math.min(width-radiusw(d.w), d.x));})
+        .attr("cy", function(d) {return d.y = Math.max(radiusw(d.w), Math.min(height-radiusw(d.w), d.y)); });
+        link.attr("d", linkArc);
+        node.attr("transform", d => `translate(${d.x},${d.y})`);
     });
 
-    // Restart the force layout.
-    force.start();
-  }
-
-  findNode = function(id) {
-    for (var i in nodes) {if (nodes[i]["id"] === id) return nodes[i]};
-  }
+  return svg.node();
 }
 
-window.onresize = function() {
-  w = window.innerWidth;
-  h = window.innerHeight;
-  force.size([w, h]);
-  vis.attr("width", w).attr("height", h);
-  update();
-}
+function parse(g) {
+  nodes = []
+  links = []
 
-function parse(data) {
+  w = {}
 
-  nodes.length = 0;
-  links.length = 0;
-  count = 0;
-
-  ids = new Set()
-  edges = new Set()
-
-  for (let key of Object.keys(data._edgeObjs)) {
-      var value = data._edgeObjs[key];
-      let v = value.v
-      let w = value.w
-      ids.add(v);
-      ids.add(w);
-      edges.add([v,w])
+  for (let key of Object.keys(g._edgeObjs)) {
+      var o = g._edgeObjs[key];
+      links.push({'source':o.v, 'target':o.w, 'type': 'suit'})
+      w[o.v] = w[o.w] = 0
   }
 
-
-  for (let key of Object.keys(data._nodes)) {
-      var value = data._nodes[key];
-      let node = key
-
-      if (ids.has(node))
-        nodes.push({"id":node, "group":'all', "name":node, "title":node, "date":'', "inbound":0, "outbound":0});
+  for (l of links) {
+    w[l.source] += 1
   }
 
+  data = ({nodes: Array.from(new Set(links.flatMap(l => [l.source, l.target])), id => ({id, 'w':w[id]})), links})
 
-  for (let item of edges) {
-    v = item[0]
-    w = item[1]
-    A = findNode(v);
-    B = findNode(w);
-    links.push({"source":A,"target":B});
-    A.outbound +=1
-    B.inbound +=1
-  }
-
-  update();
-
+  d3.select("#graph").append(chart)
 }
 
 
-graph = new myGraph("#graph");
+function resize() {
+  width = window.innerWidth;
+  height = window.innerHeight;
+  d3.select('svg').attr("width", width).attr("height", height);
+
+  if (simulation) {
+    simulation.force("center").x(width/2).y(height/2);
+    simulation.alpha(0.3).restart();
+  }
+
+}
+
+window.onresize = resize
+resize()
+
 
 fetch('https://joric.github.io/mk-family-tree/tree.gv')
   .then(response => response.text())
-  .then((data) => {
-   var g = graphlibDot.read(data);
+  .then((text) => {
+   var g = graphlibDot.read(text);
    parse(g)
 })
 
 </script>
-
-<a aria-label="View source on Github" class="github-corner" href="https://github.com/joric/mk-family-tree">
-  <svg viewbox="0 0 250 250">
-    <path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path>
-    <path class="octo-arm" d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;"></path>
-    <path class="octo-body" d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor"></path>
-  </svg>
-</a>
-
+</body>
+</html>

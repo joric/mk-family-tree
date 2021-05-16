@@ -19,15 +19,15 @@ body { padding: 0em; margin: 0em; overflow: hidden; }
 
 linkArc = d =>`M${d.source.x},${d.source.y}A0,0 0 0,1 ${d.target.x},${d.target.y}`;
 
-const r = 35
+const rad = 35
 
 radiusw = function(w) {
-  return (r * (1 + Math.min(w,15)/15.0))
+  return (rad * (1 + Math.min(w,15)/15.0))
 }
 
 function gradient(value) {
   var r = value * 255
-  b = (1.0 - value) * 255
+  var b = (1.0 - value) * 255
   return "rgb(" + r + ", 210, "+ b +")";
 }
 
@@ -74,7 +74,7 @@ chart = function() {
   const nodes = data.nodes.map(d => Object.create(d));
 
     simulation = d3.forceSimulation(nodes)
-        .force("link", d3.forceLink(links).id(d => d.id))
+        .force("link", d3.forceLink(links).id(d => d.id).distance(100).strength(1))
         .force("charge", d3.forceManyBody().strength(-500))
         .force("x", d3.forceX())
         .force("y", d3.forceY())
@@ -89,7 +89,7 @@ chart = function() {
         .join("marker")
         .attr("id", d => `arrow-${d.source.id}`)
         .attr("viewBox", "0 -5 10 10")
-        .attr("refX", d=>radiusw(d.target.w)+15)
+        .attr("refX", 0)
         .attr("refY", 0)
         .attr("markerWidth", 6)
         .attr("markerHeight", 6)
@@ -106,7 +106,6 @@ chart = function() {
         .join("path")
         .attr("stroke", d=>colorw(d.source.w))
         .attr("marker-end", d => `url(${new URL(`#arrow-${d.source.id}`, location)})`);
-
 
     const node = svg.append("g")
         .attr("fill", "currentColor")
@@ -139,7 +138,18 @@ chart = function() {
     simulation.on("tick", () => {
         node.attr("cx", function(d) {return d.x = Math.max(radiusw(d.w), Math.min(width-radiusw(d.w), d.x));})
         .attr("cy", function(d) {return d.y = Math.max(radiusw(d.w), Math.min(height-radiusw(d.w), d.y)); });
+
         link.attr("d", linkArc);
+
+        // recalculate links and back off the arrow head distance
+        link.attr("d", function(d) {
+          var pl = this.getTotalLength();
+            var r = radiusw(d.target.w)+9;
+            var m = this.getPointAtLength(pl - r);
+            var dx = m.x - d.source.x, dy = m.y - d.source.y;
+          return "M" + d.source.x + "," + d.source.y + "A0,0 0 0,1 " + m.x + "," + m.y;
+        });
+
         node.attr("transform", d => `translate(${d.x},${d.y})`);
     });
 
